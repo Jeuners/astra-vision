@@ -52,7 +52,8 @@ nur für die Dauer der Session, nichts wird auf Disk geschrieben.
 ## Nachrichten aus deutschen RSS-Feeds
 
 - **`astra/feeds.py`** — kuratierte Feed-Liste, nach Thema gruppiert
-  (`tech`, `nachrichten`, `wirtschaft`). Reine Daten, editierbar.
+  (`tech`, `nachrichten`, `wirtschaft`, `hilden` — lokal für Hilden via
+  RP ONLINE). Reine Daten, editierbar.
 - **`astra/rss.py`** — async Feed-Client (`feedparser`), holt konfigurierte
   Feeds eines Themas parallel ab, überspringt nicht erreichbare Feeds statt
   komplett zu scheitern.

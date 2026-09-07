@@ -27,5 +27,8 @@ FEEDS: dict[str, tuple[dict[str, str], ...]] = {
         },
         {"name": "manager magazin", "url": "https://www.manager-magazin.de/unternehmen/index.rss"},
     ),
+    "hilden": (
+        {"name": "RP ONLINE Hilden", "url": "https://rp-online.de/nrw/staedte/hilden/feed.rss"},
+    ),
 }
 TOPICS = tuple(FEEDS.keys())

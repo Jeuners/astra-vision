@@ -74,7 +74,8 @@ def build_tools(config: Settings, notify: Callable[[dict], None], media_store: d
                 "enum": list(TOPICS),
                 "description": (
                     "'tech' für Technologie & KI, 'nachrichten' für allgemeine "
-                    "Tagesnachrichten, 'wirtschaft' für Wirtschaftsnews."
+                    "Tagesnachrichten, 'wirtschaft' für Wirtschaftsnews, 'hilden' für "
+                    "lokale Nachrichten aus Hilden."
                 ),
             },
         },
