@@ -158,12 +158,12 @@ async def run_voice(connection, models, config, voice_state, voice_name, context
 
     @aggregators.assistant().event_handler("on_assistant_turn_stopped")
     async def assistant_turn(aggregator, message):
-        if message.content:
+        if message.content or message.interrupted:
             notify(
                 {
                     "type": "transcript",
                     "role": "assistant",
-                    "text": message.content,
+                    "text": message.content or "…",
                     "interrupted": message.interrupted,
                 }
             )

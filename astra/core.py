@@ -1,5 +1,6 @@
 """Configuration and pure request policy, independent of audio hardware."""
 
+import json
 import os
 from dataclasses import dataclass
 
@@ -106,10 +107,36 @@ def trim_messages(messages: list[dict], max_chars: int = 10000) -> list[dict]:
     return system + turns
 
 
+def normalize_tool_calls(messages: list[dict]) -> list[dict]:
+    """Ollama's native /api/chat rejects tool_calls whose function.arguments
+    is a JSON string (400 "Value looks like object..."); it wants an object.
+    Pipecat's context stores tool_calls OpenAI-style, arguments as a string,
+    so every request has to convert it back before it reaches Ollama.
+    """
+    normalized = []
+    for message in messages:
+        tool_calls = message.get("tool_calls")
+        if not tool_calls:
+            normalized.append(message)
+            continue
+        new_calls = []
+        for call in tool_calls:
+            function = call.get("function", {})
+            arguments = function.get("arguments")
+            if isinstance(arguments, str):
+                try:
+                    arguments = json.loads(arguments)
+                except json.JSONDecodeError:
+                    pass
+            new_calls.append({**call, "function": {**function, "arguments": arguments}})
+        normalized.append({**message, "tool_calls": new_calls})
+    return normalized
+
+
 def build_request(settings: Settings, messages: list[dict]) -> dict:
     return {
         "model": settings.model,
-        "messages": trim_messages(messages),
+        "messages": normalize_tool_calls(trim_messages(messages)),
         "think": False,
         "stream": True,
         "keep_alive": -1,

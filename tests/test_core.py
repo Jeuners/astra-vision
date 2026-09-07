@@ -1,6 +1,12 @@
 import unittest
 
-from astra.core import Settings, build_request, local_origin_allowed, trim_messages
+from astra.core import (
+    Settings,
+    build_request,
+    local_origin_allowed,
+    normalize_tool_calls,
+    trim_messages,
+)
 
 
 class CoreTests(unittest.TestCase):
@@ -63,6 +69,47 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(roles, ["system", "user", "assistant", "tool", "assistant"])
         self.assertEqual(trimmed[2]["tool_calls"][0]["function"]["name"], "generate_image")
         self.assertEqual(trimmed[3]["tool_call_id"], "call_1")
+
+    def test_tool_call_string_arguments_are_normalized_to_an_object(self):
+        messages = [
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "generate_image", "arguments": '{"prompt": "a cat"}'},
+                    }
+                ],
+            }
+        ]
+        normalized = normalize_tool_calls(messages)
+        self.assertEqual(
+            normalized[0]["tool_calls"][0]["function"]["arguments"], {"prompt": "a cat"}
+        )
+        # The original message is untouched (immutable transform).
+        self.assertIsInstance(messages[0]["tool_calls"][0]["function"]["arguments"], str)
+
+    def test_build_request_normalizes_tool_call_arguments_end_to_end(self):
+        messages = [
+            {"role": "user", "content": "Erzeuge ein Bild."},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "generate_image", "arguments": '{"prompt": "a cat"}'},
+                    }
+                ],
+            },
+            {"role": "tool", "tool_call_id": "call_1", "content": '{"status": "ok"}'},
+        ]
+        request = build_request(Settings(), messages)
+        tool_call_message = next(m for m in request["messages"] if m.get("tool_calls"))
+        self.assertIsInstance(tool_call_message["tool_calls"][0]["function"]["arguments"], dict)
 
     def test_image_attachment_survives_trimming(self):
         messages = [
