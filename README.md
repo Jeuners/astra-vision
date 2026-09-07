@@ -1,9 +1,9 @@
-# astra (Tools-Fork)
+# astra-vision
 
-Fork von [astra-local-voice](https://github.com/Jeuners/astra-local-voice) —
-dieser Fork enthält zusätzlich Bilderzeugung (ComfyUI) und Bild/PDF-Upload
-mit Vision (siehe unten). Die Basisversion ohne diese Werkzeuge lebt im
-Hauptrepo.
+**Fork von [astra-local-voice](https://github.com/Jeuners/astra-local-voice).**
+Gleicher lokaler Sprachagent, plus Bilderzeugung (ComfyUI) und Bild/PDF-Upload
+mit Vision (siehe unten). Die schlanke Basisversion ohne diese Werkzeuge lebt
+im Hauptrepo — dorthin zurück, falls du nur den reinen Sprachagenten willst.
 
 Ein lokaler deutscher Sprachagent für Apple Silicon. Kein Cloud-Anruf, kein
 Tracking, kein gespeichertes Audio — Spracherkennung, Sprachmodell und
