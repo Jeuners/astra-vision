@@ -37,8 +37,9 @@ async def test_generate_image_tool_stores_media_and_notifies(monkeypatch):
     assert len(media_store) == 1
     image_id, image_bytes = next(iter(media_store.items()))
     assert image_bytes == b"png-bytes"
-    assert notifications[0]["type"] == "activity"
-    assert notifications[1] == {"type": "image", "url": f"/api/media/{image_id}"}
+    assert [n["type"] for n in notifications] == ["activity", "tool_start", "image"]
+    assert "a cat" in notifications[1]["text"]
+    assert notifications[2] == {"type": "image", "url": f"/api/media/{image_id}"}
     assert params.results[0]["status"] == "ok"
 
 
@@ -60,4 +61,9 @@ async def test_generate_image_tool_reports_comfyui_errors_without_storing_media(
 
     assert media_store == {}
     assert "error" in params.results[0]
-    assert [n["type"] for n in notifications] == ["activity", "activity"]
+    assert [n["type"] for n in notifications] == [
+        "activity",
+        "tool_start",
+        "activity",
+        "tool_error",
+    ]

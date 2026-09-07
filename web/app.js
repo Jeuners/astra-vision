@@ -33,10 +33,46 @@ function addMessage(event) {
   while ($("messages").children.length > 80) $("messages").firstElementChild.remove();
   $("messages").scrollTop = $("messages").scrollHeight;
 }
-function addImage(url) {
+function addToolStart(text) {
   $("messages").querySelector(".empty")?.remove();
+  document.getElementById("pending-tool")?.remove();
   const article = document.createElement("article");
-  article.className = "message assistant";
+  article.className = "message assistant pending-tool";
+  article.id = "pending-tool";
+  const speaker = document.createElement("span");
+  speaker.className = "speaker";
+  speaker.textContent = "Astra";
+  const body = document.createElement("p");
+  body.className = "pending-text";
+  const spinner = document.createElement("i");
+  spinner.className = "spinner";
+  body.append(spinner, document.createTextNode(` ${text}`));
+  article.append(speaker, body);
+  $("messages").append(article);
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+function addToolError(text) {
+  const pending = document.getElementById("pending-tool");
+  if (pending) {
+    pending.removeAttribute("id");
+    pending.classList.remove("pending-tool");
+    pending.querySelector(".pending-text").textContent = text;
+    $("messages").scrollTop = $("messages").scrollHeight;
+    return;
+  }
+  showError(text);
+}
+function addImage(url) {
+  const pending = document.getElementById("pending-tool");
+  const article = pending || document.createElement("article");
+  if (pending) {
+    pending.removeAttribute("id");
+    pending.className = "message assistant";
+    pending.replaceChildren();
+  } else {
+    $("messages").querySelector(".empty")?.remove();
+    article.className = "message assistant";
+  }
   const speaker = document.createElement("span");
   speaker.className = "speaker";
   speaker.textContent = "Astra";
@@ -45,7 +81,7 @@ function addImage(url) {
   img.src = url;
   img.alt = "Von Astra erzeugtes Bild";
   article.append(speaker, img);
-  $("messages").append(article);
+  if (!pending) $("messages").append(article);
   $("messages").scrollTop = $("messages").scrollHeight;
 }
 function addUploadNote(filename) {
@@ -89,6 +125,8 @@ function receive(event) {
   try { message = JSON.parse(event.data); } catch { return; }
   if (message.type === "state") state(message.state);
   if (message.type === "activity" && !muted) $("status").textContent = message.text;
+  if (message.type === "tool_start") addToolStart(message.text);
+  if (message.type === "tool_error") addToolError(message.text);
   if (message.type === "partial") $("partial").textContent = message.text;
   if (message.type === "transcript") addMessage(message);
   if (message.type === "image") addImage(message.url);
