@@ -61,6 +61,29 @@ function addUploadNote(filename) {
   $("messages").append(article);
   $("messages").scrollTop = $("messages").scrollHeight;
 }
+function addUploadedImage(dataUrl, filename) {
+  $("messages").querySelector(".empty")?.remove();
+  const article = document.createElement("article");
+  article.className = "message user";
+  const speaker = document.createElement("span");
+  speaker.className = "speaker";
+  speaker.textContent = "Du";
+  const img = document.createElement("img");
+  img.className = "generated-image";
+  img.src = dataUrl;
+  img.alt = filename;
+  article.append(speaker, img);
+  $("messages").append(article);
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 function receive(event) {
   let message;
   try { message = JSON.parse(event.data); } catch { return; }
@@ -76,6 +99,10 @@ function receive(event) {
 }
 async function uploadFile(file) {
   if (!pcId) return;
+  if (file.type.startsWith("image/")) {
+    try { addUploadedImage(await fileToDataURL(file), file.name); }
+    catch { /* preview failed to render; upload still proceeds below */ }
+  }
   const body = new FormData();
   body.append("pc_id", pcId);
   body.append("file", file);
