@@ -87,10 +87,21 @@ den `read_news`-Handler direkt auf — derselbe Handler, dieselbe UI,
 nur ohne die unzuverlässige LLM-Entscheidung dazwischen. Das Ergebnis
 landet als Tool-Roundtrip im Kontext, damit die nächste LLM-Antwort es
 kennt. Live getestet: 2/2 zuverlässig, wo die reine LLM-Entscheidung nur
-~15–20 % erreichte. `generate_image` und `read_article` bleiben bewusst
-reine LLM-Tools, weil sie keine feste Trigger-Phrase haben (Bildwunsch
-und "erzähl mehr" sind zu variabel für ein Keyword-Muster) und
-`generate_image` ohnehin zuverlässig funktioniert.
+~15–20 % erreichte.
+
+Schlagzeilen werden nummeriert angezeigt (1., 2., 3. …), und derselbe
+Mechanismus kennt einen zweiten Trigger: `detect_article_reference()`
+erkennt Formulierungen wie "Artikel 2", "Artikel Nummer drei" oder
+"zweiter Artikel" im Nutzertext, löst die Nummer gegen die zuletzt
+gezeigte Liste auf und ruft `read_article` direkt mit dem passenden Link
+auf — ganz ohne dass das Modell selbst den richtigen Link kennen oder
+sich für das Werkzeug entscheiden muss. Live getestet über einen echten
+Zwei-Turn-Dialog ("News Hilden" → "Hole mir Detail zu Artikel zwei"):
+korrekt aufgelöst, echter Artikeltext abgerufen.
+
+`generate_image` bleibt bewusst ein reines LLM-Tool, weil ein Bildwunsch
+zu variabel für ein Keyword-Muster ist und ohnehin zuverlässig
+funktioniert.
 
 ## Starten
 

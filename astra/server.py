@@ -28,7 +28,7 @@ from astra.core import (
 )
 from astra.documents import extract_pdf_text
 from astra.inference import Models, on_executor
-from astra.triggers import detect_news_topic, trigger_tool
+from astra.triggers import detect_article_reference, detect_news_topic, trigger_tool
 
 ROOT = Path(__file__).resolve().parent.parent
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024
@@ -152,13 +152,23 @@ async def run_voice(connection, models, config, voice_state, voice_name, context
     async def disconnected(transport, client):
         await worker.cancel()
 
+    last_headlines: list[dict] = []
+
     @aggregators.user().event_handler("on_user_turn_stopped")
     async def user_turn(aggregator, strategy, message):
         if message.content:
             notify({"type": "transcript", "role": "user", "text": message.content})
             topic = detect_news_topic(message.content)
             if topic:
-                await trigger_tool(context, "read_news", {"topic": topic})
+                result = await trigger_tool(context, "read_news", {"topic": topic})
+                if result and result.get("status") == "ok":
+                    last_headlines[:] = result.get("headlines", [])
+                return
+            number = detect_article_reference(message.content)
+            if number is not None:
+                match = next((h for h in last_headlines if h.get("number") == number), None)
+                if match:
+                    await trigger_tool(context, "read_article", {"url": match["link"]})
 
     @aggregators.assistant().event_handler("on_assistant_turn_stopped")
     async def assistant_turn(aggregator, message):

@@ -99,8 +99,8 @@ async def test_read_news_tool_reports_headlines(monkeypatch):
     assert "KI-Durchbruch" in notifications[2]["text"]
     assert "Neuer Chip" in notifications[2]["text"]
     assert notifications[2]["items"] == [
-        {"source": "heise online", "title": "KI-Durchbruch", "link": "https://x"},
-        {"source": "Golem.de", "title": "Neuer Chip", "link": "https://y"},
+        {"number": 1, "source": "heise online", "title": "KI-Durchbruch", "link": "https://x"},
+        {"number": 2, "source": "Golem.de", "title": "Neuer Chip", "link": "https://y"},
     ]
     assert params.results[0]["status"] == "ok"
     assert len(params.results[0]["headlines"]) == 2

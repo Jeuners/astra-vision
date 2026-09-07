@@ -1,6 +1,22 @@
 import pytest
 
-from astra.triggers import detect_news_topic, trigger_tool
+from astra.triggers import detect_article_reference, detect_news_topic, trigger_tool
+
+
+def test_detect_article_reference_matches_digit():
+    assert detect_article_reference("Hole mir Detail zu Artikel 2") == 2
+    assert detect_article_reference("Artikel Nummer 4 bitte") == 4
+
+
+def test_detect_article_reference_matches_number_words():
+    assert detect_article_reference("Erzähl mir mehr zu Artikel zwei") == 2
+    assert detect_article_reference("zweiter Artikel bitte") == 2
+    assert detect_article_reference("die dritte Schlagzeile interessiert mich") == 3
+
+
+def test_detect_article_reference_returns_none_without_article_word():
+    assert detect_article_reference("Wie ist das Wetter?") is None
+    assert detect_article_reference("Erzähl mir die Nachrichten.") is None
 
 
 def test_detect_news_topic_matches_hilden():

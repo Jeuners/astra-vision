@@ -78,7 +78,7 @@ function addToolResult(text, items) {
   speaker.textContent = "Astra";
   article.append(speaker);
   if (items?.length) {
-    const list = document.createElement("ul");
+    const list = document.createElement("ol");
     list.className = "tool-result-list";
     for (const item of items) {
       const li = document.createElement("li");

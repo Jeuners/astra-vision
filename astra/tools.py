@@ -47,12 +47,14 @@ def build_tools(config: Settings, notify: Callable[[dict], None], media_store: d
             notify({"type": "tool_error", "text": str(exc)})
             await params.result_callback({"error": str(exc)})
             return
+        numbered = list(enumerate(entries, start=1))
         notify(
             {
                 "type": "tool_result",
-                "text": "\n".join(f"- ({entry.source}) {entry.title}" for entry in entries),
+                "text": "\n".join(f"{i}. ({e.source}) {e.title}" for i, e in numbered),
                 "items": [
-                    {"source": e.source, "title": e.title, "link": e.link} for e in entries
+                    {"number": i, "source": e.source, "title": e.title, "link": e.link}
+                    for i, e in numbered
                 ],
             }
         )
@@ -60,8 +62,14 @@ def build_tools(config: Settings, notify: Callable[[dict], None], media_store: d
             {
                 "status": "ok",
                 "headlines": [
-                    {"source": e.source, "title": e.title, "summary": e.summary, "link": e.link}
-                    for e in entries
+                    {
+                        "number": i,
+                        "source": e.source,
+                        "title": e.title,
+                        "summary": e.summary,
+                        "link": e.link,
+                    }
+                    for i, e in numbered
                 ],
             }
         )
