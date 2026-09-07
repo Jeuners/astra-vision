@@ -62,7 +62,7 @@ function addToolError(text) {
   }
   showError(text);
 }
-function addToolResult(text) {
+function addToolResult(text, items) {
   const pending = document.getElementById("pending-tool");
   const article = pending || document.createElement("article");
   if (pending) {
@@ -76,10 +76,36 @@ function addToolResult(text) {
   const speaker = document.createElement("span");
   speaker.className = "speaker";
   speaker.textContent = "Astra";
-  const body = document.createElement("p");
-  body.className = "tool-result";
-  body.textContent = text;
-  article.append(speaker, body);
+  article.append(speaker);
+  if (items?.length) {
+    const list = document.createElement("ul");
+    list.className = "tool-result-list";
+    for (const item of items) {
+      const li = document.createElement("li");
+      if (item.link) {
+        const link = document.createElement("a");
+        link.href = item.link;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.textContent = item.title;
+        li.append(link);
+      } else {
+        li.textContent = item.title;
+      }
+      if (item.source) {
+        const source = document.createElement("small");
+        source.textContent = ` (${item.source})`;
+        li.append(source);
+      }
+      list.append(li);
+    }
+    article.append(list);
+  } else {
+    const body = document.createElement("p");
+    body.className = "tool-result";
+    body.textContent = text;
+    article.append(body);
+  }
   if (!pending) $("messages").append(article);
   $("messages").scrollTop = $("messages").scrollHeight;
 }
@@ -148,7 +174,7 @@ function receive(event) {
   if (message.type === "activity" && !muted) $("status").textContent = message.text;
   if (message.type === "tool_start") addToolStart(message.text);
   if (message.type === "tool_error") addToolError(message.text);
-  if (message.type === "tool_result") addToolResult(message.text);
+  if (message.type === "tool_result") addToolResult(message.text, message.items);
   if (message.type === "partial") $("partial").textContent = message.text;
   if (message.type === "transcript") addMessage(message);
   if (message.type === "image") addImage(message.url);

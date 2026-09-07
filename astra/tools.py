@@ -47,8 +47,15 @@ def build_tools(config: Settings, notify: Callable[[dict], None], media_store: d
             notify({"type": "tool_error", "text": str(exc)})
             await params.result_callback({"error": str(exc)})
             return
-        headlines = "\n".join(f"- ({entry.source}) {entry.title}" for entry in entries)
-        notify({"type": "tool_result", "text": headlines})
+        notify(
+            {
+                "type": "tool_result",
+                "text": "\n".join(f"- ({entry.source}) {entry.title}" for entry in entries),
+                "items": [
+                    {"source": e.source, "title": e.title, "link": e.link} for e in entries
+                ],
+            }
+        )
         await params.result_callback(
             {
                 "status": "ok",
