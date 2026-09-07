@@ -17,9 +17,11 @@ def build_tools(config: Settings, notify: Callable[[dict], None], media_store: d
 
     async def handle_generate_image(params):
         prompt = params.arguments.get("prompt", "")
+        notify({"type": "activity", "text": "Astra erzeugt ein Bild …"})
         try:
             image = await generate_image(config.comfyui_url, prompt)
         except ComfyUIError as exc:
+            notify({"type": "activity", "text": "Bilderzeugung fehlgeschlagen."})
             await params.result_callback({"error": str(exc)})
             return
         image_id = uuid.uuid4().hex

@@ -88,6 +88,7 @@ function receive(event) {
   let message;
   try { message = JSON.parse(event.data); } catch { return; }
   if (message.type === "state") state(message.state);
+  if (message.type === "activity" && !muted) $("status").textContent = message.text;
   if (message.type === "partial") $("partial").textContent = message.text;
   if (message.type === "transcript") addMessage(message);
   if (message.type === "image") addImage(message.url);
