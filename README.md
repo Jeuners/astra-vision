@@ -28,6 +28,35 @@ Die Stimme lässt sich im UI per Dropdown wählen (`/api/voices` listet alle
 26, Auswahl wird im Browser gemerkt). Jede Stimme wird beim ersten Gebrauch
 lazy geladen und danach für die Laufzeit des Prozesses gecacht.
 
+## Architektur
+
+Jede Fähigkeit ist ein eigenständiges, gegenseitig unabhängiges Modul —
+verifiziert am Import-Graphen, nicht nur behauptet:
+
+```
+astra/comfyui.py     — nur httpx, kein astra-Import
+astra/rss.py         — nur feedparser+httpx, importiert astra.feeds (Daten)
+astra/articles.py    — nur httpx+trafilatura, kein astra-Import
+astra/documents.py   — nur pypdf, kein astra-Import
+astra/feeds.py       — reine Daten, kein einziger Import
+```
+
+Keines dieser fünf Module kennt Pipecat, LLM-Tools oder ein anderes der
+fünf. **`astra/tools.py`** ist die einzige Stelle, die sie zu
+LLM-aufrufbaren `FunctionSchema`s verdrahtet (Beschreibung + Handler +
+UI-Benachrichtigungen). **`astra/triggers.py`** ruft dieselben Handler
+bei Bedarf direkt auf — per Introspektion über `context.tools`, ohne
+`tools.py` zu importieren — wenn ein einfacher Keyword-Treffer
+zuverlässiger ist als die LLM-Entscheidung (siehe unten).
+
+### Werkzeuge im Überblick
+
+| Werkzeug | Macht | Ausgelöst durch | Live gemessene Zuverlässigkeit |
+|---|---|---|---|
+| `generate_image` | Bild via ComfyUI erzeugen | LLM-Entscheidung | ~100 % |
+| `read_news` | Schlagzeilen aus konfiguriertem RSS-Thema | Keyword-Trigger (`triggers.py`) | ~100 % (Trigger) / ~15–20 % (reine LLM-Entscheidung) |
+| `read_article` | Vollen Artikeltext zu einer Nummer/URL laden | Keyword-Trigger + LLM-Fallback | Trigger 2/2 live; LLM-Fallback ~65 % |
+
 ## Bilder erzeugen und Dokumente lesen
 
 Zwei zusätzliche, sauber getrennte Fähigkeiten, unabhängig von STT/LLM/TTS:
@@ -53,7 +82,13 @@ nur für die Dauer der Session, nichts wird auf Disk geschrieben.
 
 - **`astra/feeds.py`** — kuratierte Feed-Liste, nach Thema gruppiert
   (`tech`, `nachrichten`, `wirtschaft`, `hilden` — lokal für Hilden via
-  RP ONLINE). Reine Daten, editierbar.
+  RP ONLINE). Reine Daten, editierbar: neues Thema = neuer Dict-Key mit
+  `{"name": ..., "url": ...}`-Tupeln, neuer Feed = eine Zeile in einem
+  bestehenden Thema. `TOPICS` wird automatisch aus den Keys abgeleitet,
+  taucht dadurch sofort im `read_news`-Schema (`enum`) und in
+  `triggers.py`'s Themen-Erkennung auf — keine weitere Codeänderung nötig,
+  solange der neue Themenname selbsterklärend ist (sonst zusätzlich einen
+  Alias in `_TOPIC_ALIASES` in `astra/triggers.py` ergänzen).
 - **`astra/rss.py`** — async Feed-Client (`feedparser`), holt konfigurierte
   Feeds eines Themas parallel ab, überspringt nicht erreichbare Feeds statt
   komplett zu scheitern.
@@ -160,6 +195,13 @@ Origin-Prüfung lassen dann zusätzlich diesen einen Hostnamen durch.
   wirft, falls das Modell trotzdem Denkausgabe liefert
 - Kein Audio, keine Transkripte werden auf Disk geschrieben; der
   Gesprächsverlauf lebt nur im Speicher der laufenden Session
+- Anders als die Basisversion macht dieser Fork bewusst ausgehende
+  Verbindungen: zu ComfyUI (`ASTRA_COMFYUI_URL`), zu den konfigurierten
+  RSS-Feeds (`astra/feeds.py`) und zu beliebigen Artikel-URLs, die
+  `read_article` aufruft (aus einem `read_news`-Ergebnis oder — bei
+  LLM-Tool-Aufruf statt Trigger — theoretisch vom Modell selbst
+  vorgeschlagen). Alle drei sind auf ihre jeweilige eigene HTTP-Anfrage
+  begrenzt, keins davon hat sonstigen Datei- oder Netzwerkzugriff.
 
 ---
 
