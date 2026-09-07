@@ -1,6 +1,7 @@
 import pytest
 
 import astra.tools as tools_module
+from astra.articles import ArticleError
 from astra.comfyui import ComfyUIError
 from astra.core import Settings
 from astra.rss import Entry, RSSError
@@ -115,6 +116,54 @@ async def test_read_news_tool_reports_rss_errors(monkeypatch):
     )
 
     params = FakeFunctionCallParams({"topic": "tech"})
+    await schema.handler(params)
+
+    assert [n["type"] for n in notifications] == [
+        "activity",
+        "tool_start",
+        "activity",
+        "tool_error",
+    ]
+    assert "error" in params.results[0]
+
+
+@pytest.mark.asyncio
+async def test_read_article_tool_reports_extracted_text(monkeypatch):
+    async def fake_read_article(url, **kwargs):
+        assert url == "https://example.com/story"
+        return "Der vollständige Artikeltext."
+
+    monkeypatch.setattr(tools_module, "read_article", fake_read_article)
+
+    notifications = []
+    schema = _find(
+        tools_module.build_tools(Settings(), notifications.append, {}).standard_tools,
+        "read_article",
+    )
+
+    params = FakeFunctionCallParams({"url": "https://example.com/story"})
+    await schema.handler(params)
+
+    assert [n["type"] for n in notifications] == ["activity", "tool_start", "tool_result"]
+    assert notifications[2]["text"] == "Der vollständige Artikeltext."
+    assert params.results[0]["status"] == "ok"
+    assert params.results[0]["text"] == "Der vollständige Artikeltext."
+
+
+@pytest.mark.asyncio
+async def test_read_article_tool_reports_article_errors(monkeypatch):
+    async def failing_read_article(url, **kwargs):
+        raise ArticleError("Seite nicht erreichbar.")
+
+    monkeypatch.setattr(tools_module, "read_article", failing_read_article)
+
+    notifications = []
+    schema = _find(
+        tools_module.build_tools(Settings(), notifications.append, {}).standard_tools,
+        "read_article",
+    )
+
+    params = FakeFunctionCallParams({"url": "https://example.com/story"})
     await schema.handler(params)
 
     assert [n["type"] for n in notifications] == [

@@ -12,6 +12,7 @@ dependencies = [
   "pypdf",
   "python-multipart",
   "feedparser",
+  "trafilatura",
 ]
 
 [dependency-groups]

@@ -8,6 +8,7 @@ from collections.abc import Callable
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 
+from astra.articles import ArticleError, read_article
 from astra.comfyui import ComfyUIError, generate_image
 from astra.core import Settings
 from astra.feeds import TOPICS
@@ -58,6 +59,39 @@ def build_tools(config: Settings, notify: Callable[[dict], None], media_store: d
             }
         )
 
+    async def handle_read_article(params):
+        url = params.arguments.get("url", "")
+        notify({"type": "activity", "text": "Astra liest den Artikel …"})
+        notify({"type": "tool_start", "text": f'Lade Artikel: "{url}"'})
+        try:
+            text = await read_article(url)
+        except ArticleError as exc:
+            notify({"type": "activity", "text": "Artikel konnte nicht geladen werden."})
+            notify({"type": "tool_error", "text": str(exc)})
+            await params.result_callback({"error": str(exc)})
+            return
+        notify({"type": "tool_result", "text": text[:800]})
+        await params.result_callback({"status": "ok", "text": text})
+
+    read_article_schema = FunctionSchema(
+        name="read_article",
+        description=(
+            "Lade eine Artikel-URL (z.B. aus einem vorherigen read_news-Ergebnis) und lies "
+            "den vollständigen Artikeltext. Rufe dieses Werkzeug auf, wenn der Nutzer zu "
+            "einer bereits genannten Schlagzeile mehr Details wissen will — erfinde selbst "
+            "keine Details. Fasse den Text danach mündlich in eigenen Worten zusammen, "
+            "lies ihn nicht roh vor."
+        ),
+        properties={
+            "url": {
+                "type": "string",
+                "description": "Die 'link'-URL des Artikels aus dem read_news-Ergebnis.",
+            },
+        },
+        required=["url"],
+        handler=handle_read_article,
+    )
+
     read_news_schema = FunctionSchema(
         name="read_news",
         description=(
@@ -104,4 +138,6 @@ def build_tools(config: Settings, notify: Callable[[dict], None], media_store: d
         required=["prompt"],
         handler=handle_generate_image,
     )
-    return ToolsSchema(standard_tools=[generate_image_schema, read_news_schema])
+    return ToolsSchema(
+        standard_tools=[generate_image_schema, read_news_schema, read_article_schema]
+    )

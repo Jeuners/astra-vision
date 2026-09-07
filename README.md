@@ -60,17 +60,25 @@ nur für die Dauer der Session, nichts wird auf Disk geschrieben.
 - Tool `read_news` in `astra/tools.py`: Astra ruft es auf, wenn nach
   aktuellen Nachrichten gefragt wird, und fasst die Schlagzeilen mündlich
   zusammen statt sie roh vorzulesen.
+- **`astra/articles.py`** — lädt eine Artikel-URL und extrahiert den reinen
+  Fließtext (`trafilatura`), ohne Navigation/Werbung/Boilerplate.
+- Tool `read_article` in `astra/tools.py`: Astra ruft es auf, wenn der
+  Nutzer zu einer schon genannten Schlagzeile mehr wissen will, und liest
+  den vollen Artikeltext statt nur der RSS-Kurzbeschreibung.
 
 Tool-Verhalten steht bewusst ausschließlich in der jeweiligen
 `FunctionSchema.description` (siehe `astra/tools.py`), nicht im
 `SYSTEM_PROMPT` — eine Quelle der Wahrheit pro Werkzeug statt duplizierter
 Regeln in einem wachsenden globalen Prompt. Gemessener Preis davon: mit
-zwei gleichzeitig verfügbaren Tools (Bild + Nachrichten) ruft das lokale
-9,7B-Modell `read_news` nur noch in ca. 20–50 % der Fälle tatsächlich auf
-(vorher, mit Tool-Regeln zusätzlich im System-Prompt, ca. 60–75 %) und
-erfindet sonst Schlagzeilen. Bildgenerierung bleibt bei ~100 % zuverlässig.
-Bekannte Grenze eines kleinen lokalen Modells bei Tool-Konkurrenz, kein
-Bug — die saubere Trennung war eine bewusste Architekturentscheidung.
+drei gleichzeitig verfügbaren Tools (Bild + Nachrichten + Artikel) ruft
+das lokale 9,7B-Modell `read_news` nur noch in ca. 15–20 % der Fälle
+tatsächlich auf (vorher mit zwei Tools ca. 20–50 %, mit Tool-Regeln
+zusätzlich im System-Prompt ca. 60–75 %) und erfindet sonst Schlagzeilen.
+`read_article` ist bei einer konkreten Nachfrage zu einer schon genannten
+Schlagzeile brauchbarer (~65 %, vermutlich weil der Kontext dort weniger
+mehrdeutig ist). Bildgenerierung bleibt bei ~100 % zuverlässig. Bekannte
+Grenze eines kleinen lokalen Modells bei Tool-Konkurrenz, kein Bug — die
+saubere Trennung war eine bewusste Architekturentscheidung.
 
 ## Starten
 
