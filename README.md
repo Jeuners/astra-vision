@@ -49,6 +49,24 @@ Gesprächs über den Button „Bild oder PDF hinzufügen“ hochladen
 eingefügt, ein Bild als Base64 mit Qwens nativer Vision-Fähigkeit — beides
 nur für die Dauer der Session, nichts wird auf Disk geschrieben.
 
+## Nachrichten aus deutschen RSS-Feeds
+
+- **`astra/feeds.py`** — kuratierte Feed-Liste, nach Thema gruppiert
+  (`tech`, `nachrichten`, `wirtschaft`). Reine Daten, editierbar.
+- **`astra/rss.py`** — async Feed-Client (`feedparser`), holt konfigurierte
+  Feeds eines Themas parallel ab, überspringt nicht erreichbare Feeds statt
+  komplett zu scheitern.
+- Tool `read_news` in `astra/tools.py`: Astra ruft es auf, wenn nach
+  aktuellen Nachrichten gefragt wird, und fasst die Schlagzeilen mündlich
+  zusammen statt sie roh vorzulesen.
+
+Mit zwei gleichzeitig verfügbaren Tools (Bild + Nachrichten) sinkt beim
+lokalen 9,7B-Modell die Zuverlässigkeit, tatsächlich das Werkzeug
+aufzurufen statt Inhalte zu erfinden — gemessen ca. 60–75 % je nach
+Formulierung, trotz gestrafftem System-Prompt und reduzierter Temperatur
+(`0.4`). Bildgenerierung allein bleibt zuverlässig (~100 %). Bekannte
+Grenze eines kleinen lokalen Modells, kein Bug.
+
 ## Starten
 
 ```bash

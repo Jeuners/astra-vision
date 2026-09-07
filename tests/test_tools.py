@@ -3,6 +3,7 @@ import pytest
 import astra.tools as tools_module
 from astra.comfyui import ComfyUIError
 from astra.core import Settings
+from astra.rss import Entry, RSSError
 
 
 class FakeFunctionCallParams:
@@ -67,3 +68,59 @@ async def test_generate_image_tool_reports_comfyui_errors_without_storing_media(
         "activity",
         "tool_error",
     ]
+
+
+def _find(tools, name):
+    return next(t for t in tools if t.name == name)
+
+
+@pytest.mark.asyncio
+async def test_read_news_tool_reports_headlines(monkeypatch):
+    async def fake_read_topic(topic, **kwargs):
+        assert topic == "tech"
+        return [
+            Entry(source="heise online", title="KI-Durchbruch", summary="...", link="https://x"),
+            Entry(source="Golem.de", title="Neuer Chip", summary="...", link="https://y"),
+        ]
+
+    monkeypatch.setattr(tools_module, "read_topic", fake_read_topic)
+
+    notifications = []
+    schema = _find(
+        tools_module.build_tools(Settings(), notifications.append, {}).standard_tools,
+        "read_news",
+    )
+
+    params = FakeFunctionCallParams({"topic": "tech"})
+    await schema.handler(params)
+
+    assert [n["type"] for n in notifications] == ["activity", "tool_start", "tool_result"]
+    assert "KI-Durchbruch" in notifications[2]["text"]
+    assert "Neuer Chip" in notifications[2]["text"]
+    assert params.results[0]["status"] == "ok"
+    assert len(params.results[0]["headlines"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_read_news_tool_reports_rss_errors(monkeypatch):
+    async def failing_read_topic(topic, **kwargs):
+        raise RSSError('Keine Feeds für "tech" waren erreichbar.')
+
+    monkeypatch.setattr(tools_module, "read_topic", failing_read_topic)
+
+    notifications = []
+    schema = _find(
+        tools_module.build_tools(Settings(), notifications.append, {}).standard_tools,
+        "read_news",
+    )
+
+    params = FakeFunctionCallParams({"topic": "tech"})
+    await schema.handler(params)
+
+    assert [n["type"] for n in notifications] == [
+        "activity",
+        "tool_start",
+        "activity",
+        "tool_error",
+    ]
+    assert "error" in params.results[0]
