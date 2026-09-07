@@ -80,6 +80,18 @@ mehrdeutig ist). Bildgenerierung bleibt bei ~100 % zuverlässig. Bekannte
 Grenze eines kleinen lokalen Modells bei Tool-Konkurrenz, kein Bug — die
 saubere Trennung war eine bewusste Architekturentscheidung.
 
+**`astra/triggers.py`** umgeht diese Grenze gezielt für `read_news`: ein
+einfacher Keyword-Check (`nachrichten`/`news` + optional ein Themen-Alias
+wie `hilden`/`technik`/`wirtschaft`) im transkribierten Nutzertext ruft
+den `read_news`-Handler direkt auf — derselbe Handler, dieselbe UI,
+nur ohne die unzuverlässige LLM-Entscheidung dazwischen. Das Ergebnis
+landet als Tool-Roundtrip im Kontext, damit die nächste LLM-Antwort es
+kennt. Live getestet: 2/2 zuverlässig, wo die reine LLM-Entscheidung nur
+~15–20 % erreichte. `generate_image` und `read_article` bleiben bewusst
+reine LLM-Tools, weil sie keine feste Trigger-Phrase haben (Bildwunsch
+und "erzähl mehr" sind zu variabel für ein Keyword-Muster) und
+`generate_image` ohnehin zuverlässig funktioniert.
+
 ## Starten
 
 ```bash

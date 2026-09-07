@@ -28,6 +28,7 @@ from astra.core import (
 )
 from astra.documents import extract_pdf_text
 from astra.inference import Models, on_executor
+from astra.triggers import detect_news_topic, trigger_tool
 
 ROOT = Path(__file__).resolve().parent.parent
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024
@@ -155,6 +156,9 @@ async def run_voice(connection, models, config, voice_state, voice_name, context
     async def user_turn(aggregator, strategy, message):
         if message.content:
             notify({"type": "transcript", "role": "user", "text": message.content})
+            topic = detect_news_topic(message.content)
+            if topic:
+                await trigger_tool(context, "read_news", {"topic": topic})
 
     @aggregators.assistant().event_handler("on_assistant_turn_stopped")
     async def assistant_turn(aggregator, message):
