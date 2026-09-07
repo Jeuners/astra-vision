@@ -60,12 +60,16 @@ nur für die Dauer der Session, nichts wird auf Disk geschrieben.
   aktuellen Nachrichten gefragt wird, und fasst die Schlagzeilen mündlich
   zusammen statt sie roh vorzulesen.
 
-Mit zwei gleichzeitig verfügbaren Tools (Bild + Nachrichten) sinkt beim
-lokalen 9,7B-Modell die Zuverlässigkeit, tatsächlich das Werkzeug
-aufzurufen statt Inhalte zu erfinden — gemessen ca. 60–75 % je nach
-Formulierung, trotz gestrafftem System-Prompt und reduzierter Temperatur
-(`0.4`). Bildgenerierung allein bleibt zuverlässig (~100 %). Bekannte
-Grenze eines kleinen lokalen Modells, kein Bug.
+Tool-Verhalten steht bewusst ausschließlich in der jeweiligen
+`FunctionSchema.description` (siehe `astra/tools.py`), nicht im
+`SYSTEM_PROMPT` — eine Quelle der Wahrheit pro Werkzeug statt duplizierter
+Regeln in einem wachsenden globalen Prompt. Gemessener Preis davon: mit
+zwei gleichzeitig verfügbaren Tools (Bild + Nachrichten) ruft das lokale
+9,7B-Modell `read_news` nur noch in ca. 20–50 % der Fälle tatsächlich auf
+(vorher, mit Tool-Regeln zusätzlich im System-Prompt, ca. 60–75 %) und
+erfindet sonst Schlagzeilen. Bildgenerierung bleibt bei ~100 % zuverlässig.
+Bekannte Grenze eines kleinen lokalen Modells bei Tool-Konkurrenz, kein
+Bug — die saubere Trennung war eine bewusste Architekturentscheidung.
 
 ## Starten
 

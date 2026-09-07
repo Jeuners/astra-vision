@@ -62,8 +62,11 @@ def build_tools(config: Settings, notify: Callable[[dict], None], media_store: d
         name="read_news",
         description=(
             "Lies aktuelle Schlagzeilen aus kuratierten deutschen RSS-Feeds zu einem "
-            "Themenbereich vor. Nutze dieses Werkzeug, wenn der Nutzer nach aktuellen "
-            "Nachrichten, News oder was gerade in einem Themenbereich passiert, fragt."
+            "Themenbereich vor. Rufe dieses Werkzeug sofort auf, wenn der Nutzer nach "
+            "aktuellen Nachrichten, News oder was gerade in einem Themenbereich passiert, "
+            "fragt — erfinde selbst keine Nachrichten und kündige den Abruf nicht nur an. "
+            "Fasse die zurückgegebenen Schlagzeilen danach mündlich in eigenen Worten "
+            "zusammen, statt sie roh vorzulesen."
         ),
         properties={
             "topic": {
@@ -82,9 +85,10 @@ def build_tools(config: Settings, notify: Callable[[dict], None], media_store: d
     generate_image_schema = FunctionSchema(
         name="generate_image",
         description=(
-            "Erzeuge ein Bild anhand einer Beschreibung und zeige es dem Nutzer an. "
-            "Nutze dieses Werkzeug, wenn der Nutzer explizit ein Bild, eine Grafik "
-            "oder eine Illustration wünscht."
+            "Erzeuge ein Bild anhand einer Beschreibung und zeige es dem Nutzer sofort an. "
+            "Rufe dieses Werkzeug auf, sobald der Nutzer ein Bild, eine Grafik oder eine "
+            "Illustration möchte — beschreibe das Bild nicht nur in Worten, erzeuge es "
+            "tatsächlich."
         ),
         properties={
             "prompt": {
