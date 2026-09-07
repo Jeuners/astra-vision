@@ -23,6 +23,27 @@ Die Stimme lässt sich im UI per Dropdown wählen (`/api/voices` listet alle
 26, Auswahl wird im Browser gemerkt). Jede Stimme wird beim ersten Gebrauch
 lazy geladen und danach für die Laufzeit des Prozesses gecacht.
 
+## Bilder erzeugen und Dokumente lesen
+
+Zwei zusätzliche, sauber getrennte Fähigkeiten, unabhängig von STT/LLM/TTS:
+
+- **`astra/comfyui.py`** — reiner async HTTP-Client für einen lokalen
+  [ComfyUI](https://github.com/comfyanonymous/ComfyUI)-Server
+  (`z-image-turbo`-Workflow). Kennt nichts von Pipecat.
+- **`astra/documents.py`** — PDF-Textextraktion (`pypdf`), keine
+  Netzwerkzugriffe.
+- **`astra/tools.py`** — verdrahtet `generate_image` als natives
+  Ollama-Tool. Qwen 3.5 entscheidet selbst, wann es aufgerufen wird
+  (`ollama show qwen3.5` listet `tools` als unterstützte Fähigkeit); das
+  generierte Bild landet im laufenden Gespräch als `/api/media/<id>` und
+  wird per WebRTC-Datenkanal ans UI gemeldet.
+
+Bilder (PNG/JPEG/WebP) und PDFs lassen sich während eines laufenden
+Gesprächs über den Button „Bild oder PDF hinzufügen“ hochladen
+(`POST /api/upload`). Ein PDF wird als Text in den Gesprächskontext
+eingefügt, ein Bild als Base64 mit Qwens nativer Vision-Fähigkeit — beides
+nur für die Dauer der Session, nichts wird auf Disk geschrieben.
+
 ## Starten
 
 ```bash
@@ -47,6 +68,7 @@ gezogen sein. Die Seite öffnen, Mikrofon erlauben, sprechen.
 | `ASTRA_VOICE` | `alba` |
 | `ASTRA_PORT` | `7860` |
 | `ASTRA_TAILNET_HOST` | *(leer)* — z. B. `minim4-1.tail0f2cb2.ts.net` |
+| `ASTRA_COMFYUI_URL` | `http://100.125.107.123:8000` |
 
 ## Tests
 

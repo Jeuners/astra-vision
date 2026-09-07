@@ -4,6 +4,7 @@ import asyncio
 import json
 import time
 from contextlib import aclosing
+from uuid import uuid4
 
 import httpx
 from loguru import logger
@@ -20,12 +21,14 @@ from pipecat.frames.frames import (
     VADUserStartedSpeakingFrame,
     VADUserStoppedSpeakingFrame,
 )
+from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.settings import STTSettings, TTSSettings
 from pipecat.services.stt_service import STTService
 from pipecat.services.tts_service import TTSService
 from pipecat.utils.time import time_now_iso8601
+from pipecat.utils.types import is_given
 
 from astra.core import Settings, build_request
 from astra.inference import Models, Recognizer, drain_stream, on_executor
@@ -45,9 +48,12 @@ class NativeOllamaService(OpenAILLMService):
         self.config = config
         self.notify = notify
 
-    async def get_chat_completions(self, context):
+    async def get_chat_completions(self, context: LLMContext):
         payload = build_request(self.config, context.get_messages())
         context.set_messages(payload["messages"])
+        tools = self.get_llm_adapter().from_standard_tools(context.tools)
+        if is_given(tools) and tools:
+            payload["tools"] = list(tools)
 
         async def chunks():
             start = time.monotonic()
@@ -67,6 +73,35 @@ class NativeOllamaService(OpenAILLMService):
                         message = event.get("message", {})
                         if message.get("thinking"):
                             raise RuntimeError("Ollama liefert Thinking trotz think=false.")
+                        for tool_index, call in enumerate(message.get("tool_calls") or []):
+                            function = call.get("function", {})
+                            yield ChatCompletionChunk(
+                                id="local",
+                                object="chat.completion.chunk",
+                                created=int(time.time()),
+                                model=self.config.model,
+                                choices=[
+                                    {
+                                        "index": 0,
+                                        "delta": {
+                                            "tool_calls": [
+                                                {
+                                                    "index": tool_index,
+                                                    "id": f"call_{uuid4().hex}",
+                                                    "type": "function",
+                                                    "function": {
+                                                        "name": function.get("name", ""),
+                                                        "arguments": json.dumps(
+                                                            function.get("arguments") or {}
+                                                        ),
+                                                    },
+                                                }
+                                            ]
+                                        },
+                                        "finish_reason": None,
+                                    }
+                                ],
+                            )
                         content = message.get("content", "")
                         if content:
                             if first:

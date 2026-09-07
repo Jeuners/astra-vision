@@ -14,6 +14,7 @@ class Settings:
     port: int = 7860
     context_tokens: int = 4096
     tailnet_host: str | None = None
+    comfyui_url: str = "http://100.125.107.123:8000"
 
     @classmethod
     def from_env(cls):
@@ -25,6 +26,7 @@ class Settings:
             voice=os.getenv("ASTRA_VOICE", cls.voice),
             port=int(os.getenv("ASTRA_PORT", cls.port)),
             tailnet_host=os.getenv("ASTRA_TAILNET_HOST", cls.tailnet_host),
+            comfyui_url=os.getenv("ASTRA_COMFYUI_URL", cls.comfyui_url).rstrip("/"),
         )
 
 
@@ -64,30 +66,40 @@ SYSTEM_PROMPT = (
     "Antworte natürlich und knapp, normalerweise in ein bis drei kurzen Sätzen. "
     "Deine Antwort wird vorgelesen: kein Markdown, keine Sternchen, keine Listen. "
     "Sprich Zahlen und Abkürzungen verständlich aus. Stelle bei Bedarf eine kurze Rückfrage. "
-    "Du hast keine Werkzeuge, keinen Internetzugang und keinen Zugriff auf Dateien oder Apps. "
-    "Behaupte nicht, Aktionen ausgeführt zu haben."
+    "Du hast keinen Internetzugang und keinen Zugriff auf Dateien oder Apps, außer den dir "
+    "explizit gegebenen Werkzeugen. Behaupte nicht, andere Aktionen ausgeführt zu haben. "
+    "Wenn der Nutzer ein Bild, eine Grafik oder eine Illustration möchte, rufe sofort das "
+    "Werkzeug generate_image auf, statt das Bild nur in Worten zu beschreiben. "
+    "Wenn der Nutzer ein Bild, ein Dokument oder ein PDF hochlädt, geht dessen Inhalt oder "
+    "eine Textzusammenfassung als Nachricht in dieses Gespräch ein."
 )
 
 
 def trim_messages(messages: list[dict], max_chars: int = 10000) -> list[dict]:
-    """Retain recent whole turns within a conservative context character budget."""
+    """Retain recent whole turns within a conservative context character budget.
+
+    Preserves tool round-trips (assistant tool_calls + matching tool result)
+    and vision attachments (an "images" field) intact instead of reducing
+    every kept message down to a bare role/content pair.
+    """
     system = [dict(m) for m in messages if m["role"] == "system"][:1]
     if system:
         system[0]["content"] = system[0]["content"][: max_chars // 2]
     budget = max_chars - sum(len(m["content"]) for m in system)
     turns = []
     for message in reversed(messages):
-        if message["role"] not in ("user", "assistant"):
+        if message["role"] not in ("user", "assistant", "tool"):
             continue
         content = message.get("content")
-        if not isinstance(content, str) or not content:
+        text = content if isinstance(content, str) else ""
+        if not text and not message.get("tool_calls") and not message.get("images"):
             continue
-        if len(content) > budget:
+        if len(text) > budget:
             if not turns:
-                turns.append({"role": message["role"], "content": content[-budget:]})
+                turns.append({**message, "content": text[-budget:]})
             break
-        turns.append({"role": message["role"], "content": content})
-        budget -= len(content)
+        turns.append(message)
+        budget -= len(text)
     turns.reverse()
     while turns and turns[0]["role"] != "user":
         turns.pop(0)

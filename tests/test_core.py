@@ -46,6 +46,36 @@ class CoreTests(unittest.TestCase):
         )
         self.assertLessEqual(sum(len(m["content"]) for m in trimmed), 5000)
 
+    def test_tool_round_trip_survives_trimming(self):
+        messages = [
+            {"role": "system", "content": "Deutsch"},
+            {"role": "user", "content": "Zeig mir ein Bild von einer Katze."},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{"function": {"name": "generate_image", "arguments": {}}}],
+            },
+            {"role": "tool", "content": '{"status": "ok"}', "tool_call_id": "call_1"},
+            {"role": "assistant", "content": "Fertig, schau mal!"},
+        ]
+        trimmed = trim_messages(messages, max_chars=5000)
+        roles = [m["role"] for m in trimmed]
+        self.assertEqual(roles, ["system", "user", "assistant", "tool", "assistant"])
+        self.assertEqual(trimmed[2]["tool_calls"][0]["function"]["name"], "generate_image")
+        self.assertEqual(trimmed[3]["tool_call_id"], "call_1")
+
+    def test_image_attachment_survives_trimming(self):
+        messages = [
+            {"role": "system", "content": "Deutsch"},
+            {
+                "role": "user",
+                "content": '[Hochgeladenes Bild "katze.png"]',
+                "images": ["base64data"],
+            },
+        ]
+        trimmed = trim_messages(messages, max_chars=5000)
+        self.assertEqual(trimmed[1]["images"], ["base64data"])
+
 
 if __name__ == "__main__":
     unittest.main()

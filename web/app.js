@@ -33,15 +33,58 @@ function addMessage(event) {
   while ($("messages").children.length > 80) $("messages").firstElementChild.remove();
   $("messages").scrollTop = $("messages").scrollHeight;
 }
+function addImage(url) {
+  $("messages").querySelector(".empty")?.remove();
+  const article = document.createElement("article");
+  article.className = "message assistant";
+  const speaker = document.createElement("span");
+  speaker.className = "speaker";
+  speaker.textContent = "Astra";
+  const img = document.createElement("img");
+  img.className = "generated-image";
+  img.src = url;
+  img.alt = "Von Astra erzeugtes Bild";
+  article.append(speaker, img);
+  $("messages").append(article);
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+function addUploadNote(filename) {
+  $("messages").querySelector(".empty")?.remove();
+  const article = document.createElement("article");
+  article.className = "message user";
+  const speaker = document.createElement("span");
+  speaker.className = "speaker";
+  speaker.textContent = "Du";
+  const text = document.createElement("p");
+  text.textContent = `Hochgeladen: ${filename}`;
+  article.append(speaker, text);
+  $("messages").append(article);
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
 function receive(event) {
   let message;
   try { message = JSON.parse(event.data); } catch { return; }
   if (message.type === "state") state(message.state);
   if (message.type === "partial") $("partial").textContent = message.text;
   if (message.type === "transcript") addMessage(message);
+  if (message.type === "image") addImage(message.url);
+  if (message.type === "upload") addUploadNote(message.filename);
   if (message.type === "error") showError(message.message);
   if (message.type === "metric" && message.name === "llm_ms") {
     $("latency").textContent = `Erstes Antwortwort · ${(message.value / 1000).toFixed(2)} s`;
+  }
+}
+async function uploadFile(file) {
+  if (!pcId) return;
+  const body = new FormData();
+  body.append("pc_id", pcId);
+  body.append("file", file);
+  try {
+    const response = await fetch("/api/upload", {method: "POST", body, signal: AbortSignal.timeout(30000)});
+    const data = await response.json();
+    if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Upload fehlgeschlagen.");
+  } catch (error) {
+    showError(error.message || "Upload fehlgeschlagen.");
   }
 }
 async function request(path, body, timeout = 20000) {
@@ -121,6 +164,7 @@ async function connect() {
     await pc.setRemoteDescription({sdp: answer.sdp, type: answer.type});
     $("connect").textContent = "Gespräch beenden";
     $("mute").hidden = false;
+    $("attach").hidden = false;
     $("clear").textContent = "Neues Gespräch";
     $("hint").textContent = "Sprich frei. Beim Dazwischenreden hält Astra an.";
   } catch (error) {
@@ -155,6 +199,7 @@ async function disconnect() {
   $("mute").hidden = true;
   $("mute").setAttribute("aria-pressed", "false");
   $("mute").textContent = "Mikrofon pausieren";
+  $("attach").hidden = true;
   $("connect").textContent = "Gespräch starten";
   $("clear").textContent = "Verlauf leeren";
   $("partial").textContent = "";
@@ -171,6 +216,12 @@ $("mute").addEventListener("click", () => {
   $("mute").setAttribute("aria-pressed", String(muted));
   $("mute").textContent = muted ? "Mikrofon aktivieren" : "Mikrofon pausieren";
   state("listening");
+});
+$("attach").addEventListener("click", () => $("file-input").click());
+$("file-input").addEventListener("change", async () => {
+  const file = $("file-input").files[0];
+  $("file-input").value = "";
+  if (file) await uploadFile(file);
 });
 $("clear").addEventListener("click", async () => {
   const reconnect = Boolean(peer);

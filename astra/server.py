@@ -1,6 +1,7 @@
 """Loopback-only WebRTC voice app. One live session shares the warm models."""
 
 import asyncio
+import base64
 import contextlib
 import os
 import sys
@@ -11,8 +12,8 @@ from typing import Literal
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from pydantic import BaseModel, Field, field_validator
@@ -25,9 +26,11 @@ from astra.core import (
     build_request,
     local_origin_allowed,
 )
+from astra.documents import extract_pdf_text
 from astra.inference import Models, on_executor
 
 ROOT = Path(__file__).resolve().parent.parent
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 
 
 class Offer(BaseModel):
@@ -47,7 +50,7 @@ class Disconnect(BaseModel):
     pc_id: str = Field(max_length=100)
 
 
-async def run_voice(connection, models, config, voice_state, voice_name):
+async def run_voice(connection, models, config, voice_state, voice_name, context):
     from pipecat.audio.vad.silero import SileroVADAnalyzer
     from pipecat.audio.vad.vad_analyzer import VADParams
     from pipecat.frames.frames import (
@@ -60,7 +63,6 @@ async def run_voice(connection, models, config, voice_state, voice_name):
     from pipecat.observers.base_observer import BaseObserver
     from pipecat.pipeline.pipeline import Pipeline
     from pipecat.pipeline.worker import PipelineParams, PipelineWorker
-    from pipecat.processors.aggregators.llm_context import LLMContext
     from pipecat.processors.aggregators.llm_response_universal import (
         LLMContextAggregatorPair,
         LLMUserAggregatorParams,
@@ -106,7 +108,6 @@ async def run_voice(connection, models, config, voice_state, voice_name):
             audio_out_sample_rate=24000,
         ),
     )
-    context = LLMContext([{"role": "system", "content": SYSTEM_PROMPT}])
     aggregators = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
@@ -181,6 +182,7 @@ def create_app(config=None, *, load_models=True):
     models = Models(config)
     status = {"ready": False, "stage": "starting", "error": None}
     sessions = {}
+    media_store: dict[str, bytes] = {}
     lock = asyncio.Lock()
 
     async def warmup():
@@ -241,7 +243,7 @@ def create_app(config=None, *, load_models=True):
                 warming.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await warming
-            for connection, task in list(sessions.values()):
+            for connection, task, _ in list(sessions.values()):
                 await connection.disconnect()
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
@@ -295,7 +297,10 @@ def create_app(config=None, *, load_models=True):
                 )
             voice_name = body.voice or config.voice
             voice_state = await on_executor(models.tts_executor, models.get_voice, voice_name)
+            from pipecat.processors.aggregators.llm_context import LLMContext
             from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
+
+            from astra.tools import build_tools
 
             connection = SmallWebRTCConnection(ice_servers=[], connection_timeout_secs=20)
             try:
@@ -304,9 +309,15 @@ def create_app(config=None, *, load_models=True):
                 await connection.disconnect()
                 raise
 
+            notify = connection.send_app_message
+            context = LLMContext(
+                [{"role": "system", "content": SYSTEM_PROMPT}],
+                tools=build_tools(config, notify, media_store),
+            )
+
             async def session():
                 try:
-                    await run_voice(connection, models, config, voice_state, voice_name)
+                    await run_voice(connection, models, config, voice_state, voice_name, context)
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
@@ -317,18 +328,57 @@ def create_app(config=None, *, load_models=True):
                     sessions.pop(connection.pc_id, None)
 
             task = asyncio.create_task(session())
-            sessions[connection.pc_id] = (connection, task)
+            sessions[connection.pc_id] = (connection, task, context)
             return connection.get_answer()
 
     @app.post("/api/disconnect")
     async def disconnect(body: Disconnect):
         pair = sessions.get(body.pc_id)
         if pair:
-            connection, task = pair
+            connection, task, _ = pair
             await connection.disconnect()
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+        return {"ok": True}
+
+    @app.get("/api/media/{image_id}")
+    async def media(image_id: str):
+        image = media_store.get(image_id)
+        if image is None:
+            raise HTTPException(404, "Bild nicht gefunden")
+        return Response(content=image, media_type="image/png")
+
+    @app.post("/api/upload")
+    async def upload(pc_id: str = Form(...), file: UploadFile = File(...)):  # noqa: B008
+        pair = sessions.get(pc_id)
+        if not pair:
+            raise HTTPException(404, "Keine aktive Sitzung")
+        connection, _, context = pair
+        data = await file.read()
+        if len(data) > MAX_UPLOAD_BYTES:
+            raise HTTPException(413, "Datei zu groß (max. 15 MB)")
+        if file.content_type == "application/pdf":
+            text = extract_pdf_text(data)
+            if not text:
+                raise HTTPException(422, "Im PDF wurde kein Text gefunden")
+            context.add_message(
+                {
+                    "role": "user",
+                    "content": f'[Hochgeladenes Dokument "{file.filename}"]\n\n{text}',
+                }
+            )
+        elif file.content_type in {"image/png", "image/jpeg", "image/webp"}:
+            context.add_message(
+                {
+                    "role": "user",
+                    "content": f'[Hochgeladenes Bild "{file.filename}"]',
+                    "images": [base64.b64encode(data).decode()],
+                }
+            )
+        else:
+            raise HTTPException(415, "Nur PDF, PNG, JPEG oder WebP werden unterstützt")
+        connection.send_app_message({"type": "upload", "filename": file.filename})
         return {"ok": True}
 
     app.mount("/static", StaticFiles(directory=ROOT / "web"), name="static")

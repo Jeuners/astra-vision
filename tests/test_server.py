@@ -55,6 +55,23 @@ def test_offer_rejects_unknown_voice():
         assert response.status_code == 422
 
 
+def test_media_endpoint_returns_404_for_unknown_image():
+    with TestClient(create_app(load_models=False), base_url="http://localhost:7860") as client:
+        response = client.get("/api/media/does-not-exist")
+        assert response.status_code == 404
+
+
+def test_upload_requires_an_active_session():
+    with TestClient(create_app(load_models=False), base_url="http://localhost:7860") as client:
+        response = client.post(
+            "/api/upload",
+            headers={"Origin": "http://localhost:7860"},
+            data={"pc_id": "no-such-session"},
+            files={"file": ("test.pdf", b"%PDF-1.1", "application/pdf")},
+        )
+        assert response.status_code == 404
+
+
 def test_disconnect_is_idempotent_and_host_is_checked():
     with TestClient(create_app(load_models=False), base_url="http://localhost:7860") as client:
         response = client.post(
